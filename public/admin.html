@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <title>管理員頁面</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+</head>
+<body class="container py-4">
+  <h1 class="mb-4">🔐 管理員後台</h1>
+  <div id="loginSection" class="mb-4">
+    <h4>登入以繼續</h4>
+    <input type="password" id="adminPassword" placeholder="輸入管理員密碼" class="form-control mb-2" />
+    <button class="btn btn-primary" onclick="login()">登入</button>
+  </div>
+
+  <div id="adminPanel" style="display:none;">
+    <button class="btn btn-outline-danger mb-3" onclick="logout()">登出</button>
+
+    <h4>📦 補貨管理</h4>
+    <div id="restockList"></div>
+
+    <h4 class="mt-5">🆕 新增商品</h4>
+    <form id="addProductForm" class="mb-3">
+      <input type="text" name="name" placeholder="商品名稱" required class="form-control mb-2">
+      <input type="number" name="price" placeholder="價格" required class="form-control mb-2">
+      <input type="number" name="stock" placeholder="初始庫存" required class="form-control mb-2">
+      <button class="btn btn-success">新增商品</button>
+    </form>
+
+    <h4>📜 補貨紀錄</h4>
+    <ul id="historyList" class="list-group"></ul>
+  </div>
+
+  <script>
+    function login() {
+      const password = document.getElementById('adminPassword').value;
+      fetch('/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password })
+      }).then(res => res.json()).then(data => {
+        if (data.success) {
+          document.getElementById('loginSection').style.display = 'none';
+          document.getElementById('adminPanel').style.display = 'block';
+          loadData();
+        } else {
+          alert("❌ 密碼錯誤");
+        }
+      });
+    }
+
+    function logout() {
+      location.href = '/logout';
+    }
+
+    function loadData() {
+      fetch('/products').then(res => res.json()).then(products => {
+        const restockList = document.getElementById('restockList');
+        restockList.innerHTML = '';
+
+        products.forEach(p => {
+          const form = document.createElement('form');
+          form.className = "d-flex gap-2 mb-2 align-items-center";
+          form.innerHTML = `
+            <strong>${p.name}</strong>（庫存：${p.stock}）
+            <input type="number" name="qty" value="1" min="1" class="form-control" style="width: 80px;">
+            <button class="btn btn-sm btn-success">補貨</button>
+          `;
+
+          form.onsubmit = e => {
+            e.preventDefault();
+            const qtyInput = form.querySelector('input[name="qty"]');
+            const qty = parseInt(qtyInput.value);
+
+            if (isNaN(qty) || qty <= 0) {
+              alert("❌ 補貨數量必須為大於 0 的整數！");
+              qtyInput.focus();
+              return;
+            }
+
+            fetch('/restock', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ productId: p.id, quantity: qty })
+            }).then(() => loadData());
+          };
+
+          restockList.appendChild(form);
+        });
+      });
+
+      fetch('/restock-history').then(res => res.json()).then(records => {
+        const list = document.getElementById('historyList');
+        list.innerHTML = '';
+        records.slice().reverse().forEach(r => {
+          const item = document.createElement('li');
+          item.className = "list-group-item";
+          item.textContent = `${r.time} - ${r.name} 補貨 ${r.quantity} 件`;
+          list.appendChild(item);
+        });
+      });
+    }
+
+    document.getElementById('addProductForm').addEventListener('submit', function (e) {
+      e.preventDefault();
+      const formData = new FormData(this);
+      const name = formData.get('name').trim();
+      const price = parseInt(formData.get('price'));
+      const stock = parseInt(formData.get('stock'));
+
+      if (!name) {
+        alert("❌ 請輸入商品名稱！");
+        return;
+      }
+      if (isNaN(price) || price <= 0) {
+        alert("❌ 價格必須為大於 0 的整數！");
+        return;
+      }
+      if (isNaN(stock) || stock < 0) {
+        alert("❌ 初始庫存必須為 0 或以上的整數！");
+        return;
+      }
+
+      fetch('/add-product', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, price, stock })
+      }).then(() => {
+        this.reset();
+        loadData();
+      });
+    });
+  </script>
+</body>
+</html>
