@@ -2,104 +2,74 @@
 <html lang="zh-Hant">
 <head>
   <meta charset="UTF-8">
-  <title>訂單查詢系統</title>
+  <title>查詢訂單</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 </head>
 <body class="container py-4">
-  <h2 class="mb-4">📋 訂單查詢系統</h2>
+  <h1 class="mb-4">📋 訂單查詢</h1>
 
-  <form id="searchForm" class="row g-2 mb-4">
-    <div class="col-md-3">
-      <input type="text" name="name" class="form-control" placeholder="姓名">
-    </div>
-    <div class="col-md-3">
-      <input type="text" name="phone" class="form-control" placeholder="電話">
-    </div>
-    <div class="col-md-2">
-      <input type="date" name="start" class="form-control">
-    </div>
-    <div class="col-md-2">
-      <input type="date" name="end" class="form-control">
-    </div>
-    <div class="col-md-2 d-flex align-items-center">
-      <select name="sort" class="form-select">
-        <option value="">排序方式</option>
-        <option value="amount">金額高→低</option>
-        <option value="date">最新→最舊</option>
+  <div class="row g-2 mb-3">
+    <div class="col"><input id="nameInput" class="form-control" placeholder="姓名"></div>
+    <div class="col"><input id="phoneInput" class="form-control" placeholder="電話"></div>
+    <div class="col"><input id="startDate" type="date" class="form-control"></div>
+    <div class="col"><input id="endDate" type="date" class="form-control"></div>
+    <div class="col">
+      <select id="sortSelect" class="form-select">
+        <option value="">不排序</option>
+        <option value="amount">金額排序</option>
+        <option value="date">日期排序</option>
       </select>
     </div>
-    <div class="col-md-12">
-      <div class="form-check">
-        <input class="form-check-input" type="checkbox" id="todayOnly">
-        <label class="form-check-label" for="todayOnly">只顯示今天的訂單</label>
-      </div>
-    </div>
-    <div class="col-md-12">
-      <button class="btn btn-primary">查詢</button>
-      <button type="button" class="btn btn-success" onclick="exportPDF()">匯出 PDF</button>
-    </div>
-  </form>
+    <div class="col"><button class="btn btn-primary w-100" onclick="queryOrders()">查詢</button></div>
+  </div>
 
-  <div id="results"></div>
+  <table class="table table-bordered">
+    <thead class="table-light">
+      <tr>
+        <th>訂單編號</th>
+        <th>姓名</th>
+        <th>電話</th>
+        <th>地址</th>
+        <th>取貨日</th>
+        <th>備註</th>
+        <th>內容</th>
+        <th>金額</th>
+      </tr>
+    </thead>
+    <tbody id="orderTable"></tbody>
+  </table>
 
   <script>
-    async function exportPDF() {
-      const { jsPDF } = window.jspdf;
-      const doc = new jsPDF();
-      const results = document.querySelectorAll('.order-card');
-      if (results.length === 0) return alert('沒有結果可匯出');
-      results.forEach((el, i) => {
-        doc.text(el.textContent.trim(), 10, 10 + i * 20);
-      });
-      doc.save("訂單查詢結果.pdf");
+    function queryOrders() {
+      const name = document.getElementById('nameInput').value;
+      const phone = document.getElementById('phoneInput').value;
+      const start = document.getElementById('startDate').value;
+      const end = document.getElementById('endDate').value;
+      const sort = document.getElementById('sortSelect').value;
+
+      const params = new URLSearchParams({ name, phone, start, end, sort });
+      fetch('/query-orders?' + params)
+        .then(res => res.json())
+        .then(data => {
+          const table = document.getElementById('orderTable');
+          table.innerHTML = '';
+          data.forEach(order => {
+            const tr = document.createElement('tr');
+            const items = order.items.map(i => `${i.product.name} × ${i.quantity}`).join('<br>');
+            tr.innerHTML = `
+              <td>${order.id}</td>
+              <td>${order.name}</td>
+              <td>${order.phone}</td>
+              <td>${order.address}</td>
+              <td>${order.pickupDate}</td>
+              <td>${order.note || '—'}</td>
+              <td>${items}</td>
+              <td>NT$${order.total}</td>
+            `;
+            table.appendChild(tr);
+          });
+        });
     }
-
-    document.getElementById('searchForm').addEventListener('submit', async function(e) {
-      e.preventDefault();
-      const formData = new FormData(this);
-      const name = formData.get('name');
-      const phone = formData.get('phone');
-      const start = formData.get('start');
-      const end = formData.get('end');
-      const sort = formData.get('sort');
-      const todayOnly = document.getElementById('todayOnly').checked;
-
-      let url = `/query-orders?name=${name}&phone=${phone}&sort=${sort}`;
-      if (todayOnly) {
-        const today = new Date().toISOString().split('T')[0];
-        url += `&start=${today}&end=${today}`;
-      } else {
-        if (start) url += `&start=${start}`;
-        if (end) url += `&end=${end}`;
-      }
-
-      const res = await fetch(url);
-      const data = await res.json();
-      const container = document.getElementById('results');
-      container.innerHTML = '';
-
-      if (data.length === 0) {
-        container.innerHTML = '<div class="alert alert-warning">❌ 查無訂單</div>';
-        return;
-      }
-
-      data.forEach(order => {
-        const div = document.createElement('div');
-        div.className = 'order-card card mb-3';
-        div.innerHTML = `
-          <div class="card-body">
-            <h5 class="card-title">訂單編號 #${order.id}</h5>
-            <p>姓名：${order.name}｜電話：${order.phone}<br>
-               地址：${order.address}｜取貨日：${order.pickupDate}<br>
-               金額：${order.total} 元<br>
-               商品：<ul>${order.items.map(i => `<li>${i.product.name} × ${i.quantity}</li>`).join('')}</ul>
-            </p>
-          </div>
-        `;
-        container.appendChild(div);
-      });
-    });
   </script>
 </body>
 </html>

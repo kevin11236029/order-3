@@ -21,17 +21,48 @@
     <h4>📋 填寫訂單資料</h4>
     <div class="mb-2"><input name="name" required class="form-control" placeholder="姓名"></div>
     <div class="mb-2"><input name="phone" required class="form-control" placeholder="電話"></div>
-    <div class="mb-2"><input name="address" required class="form-control" placeholder="地址"></div>
+    <div class="mb-2">
+      <select name="deliveryOption" id="deliveryOption" class="form-select" onchange="toggleAddress()">
+        <option value="delivery">宅配</option>
+        <option value="pickup">自取</option>
+      </select>
+    </div>
+    <div class="mb-2" id="addressGroup">
+      <input name="address" class="form-control" placeholder="地址">
+    </div>
     <div class="mb-3">
       <label>📅 取貨日：</label>
-      <input type="date" name="pickupDate" required class="form-control">
+      <input type="date" name="pickupDate" id="pickupDate" required class="form-control">
     </div>
-    <button type="submit" class="btn btn-primary">送出訂單</button>
+    <div class="mb-3">
+      <textarea name="note" class="form-control" placeholder="備註（例如：請幫我分開包裝）"></textarea>
+    </div>
+    <button type="submit" id="submitBtn" class="btn btn-primary">送出訂單</button>
   </form>
+
+  <div id="orderSummary" class="mt-5" style="display:none">
+    <h4>✅ 訂單已成立</h4>
+    <div id="orderDetails" class="border p-3 rounded bg-light"></div>
+    <button class="btn btn-success mt-3" onclick="window.location.href='/'">返回首頁</button>
+  </div>
 
   <script>
     let products = [];
     let cart = [];
+
+    function toggleAddress() {
+      const option = document.getElementById('deliveryOption').value;
+      const addressGroup = document.getElementById('addressGroup');
+      const addressInput = addressGroup.querySelector('input');
+
+      if (option === 'pickup') {
+        addressGroup.style.display = 'none';
+        addressInput.removeAttribute('required');
+      } else {
+        addressGroup.style.display = 'block';
+        addressInput.setAttribute('required', 'required');
+      }
+    }
 
     function renderCart() {
       const cartList = document.getElementById('cartList');
@@ -103,15 +134,62 @@
 
     document.getElementById('orderForm').addEventListener('submit', e => {
       e.preventDefault();
-      if (cart.length === 0) return alert("請先選擇商品");
+      const submitBtn = document.getElementById('submitBtn');
+      submitBtn.disabled = true;
+
+      if (cart.length === 0) {
+        alert("請先選擇商品");
+        submitBtn.disabled = false;
+        return;
+      }
 
       const form = e.target;
       const formData = new FormData(form);
+
+      const name = formData.get('name').trim();
+      if (!/^[\u4e00-\u9fa5]{2,}$/.test(name)) {
+        alert("❌ 姓名格式錯誤，請輸入至少兩個中文字！");
+        form.querySelector('input[name="name"]').focus();
+        submitBtn.disabled = false;
+        return;
+      }
+
+      let phone = formData.get('phone').trim();
+      if (/^[0-9]{9}$/.test(phone)) {
+        phone = '09' + phone;
+      }
+      if (!/^09[0-9]{8}$/.test(phone)) {
+        alert("❌ 電話號碼格式錯誤，請輸入正確的手機號碼！");
+        form.querySelector('input[name="phone"]').focus();
+        submitBtn.disabled = false;
+        return;
+      }
+
+      const deliveryOption = formData.get('deliveryOption');
+      let address = deliveryOption === 'pickup' ? '自取' : formData.get('address').trim();
+      if (deliveryOption === 'delivery' && address.length < 5) {
+        alert("❌ 地址格式錯誤，請輸入完整地址（至少5字）！");
+        form.querySelector('input[name="address"]').focus();
+        submitBtn.disabled = false;
+        return;
+      }
+
+      const pickupDate = formData.get('pickupDate');
+      const note = formData.get('note').trim();
+      const today = new Date().toISOString().split('T')[0];
+      if (pickupDate < today) {
+        alert("❌ 取貨日不能早於今天！");
+        form.querySelector('input[name="pickupDate"]').focus();
+        submitBtn.disabled = false;
+        return;
+      }
+
       const order = {
-        name: formData.get('name'),
-        phone: formData.get('phone'),
-        address: formData.get('address'),
-        pickupDate: formData.get('pickupDate'),
+        name,
+        phone,
+        address,
+        pickupDate,
+        note,
         items: cart.map(c => ({
           productId: c.product.id,
           quantity: c.quantity
@@ -126,12 +204,34 @@
       .then(res => res.json())
       .then(data => {
         if (data.success) {
-          alert(data.message);
+          document.getElementById('orderForm').style.display = 'none';
+          document.getElementById('orderSummary').style.display = 'block';
+          const details = document.getElementById('orderDetails');
+          let summary = `
+            <p><strong>姓名：</strong>${name}</p>
+            <p><strong>電話：</strong>${phone}</p>
+            <p><strong>地址：</strong>${address}</p>
+            <p><strong>取貨日：</strong>${pickupDate}</p>
+            <p><strong>備註：</strong>${note || '無'}</p>
+            <hr><ul class="list-group mb-2">
+          `;
+          let total = 0;
+          cart.forEach(item => {
+            const subtotal = item.quantity * item.product.price;
+            total += subtotal;
+            summary += `<li class="list-group-item">${item.product.name} × ${item.quantity} 件 = NT$${subtotal}</li>`;
+          });
+          summary += `</ul><p><strong>總金額：</strong>NT$${total}</p>`;
+          details.innerHTML = summary;
           clearCart();
-          window.location.href = "/";
         } else {
           alert("❌ 訂單失敗：\n" + data.message);
+          submitBtn.disabled = false;
         }
+      })
+      .catch(() => {
+        alert("❌ 系統錯誤，請稍後再試！");
+        submitBtn.disabled = false;
       });
     });
 
@@ -158,6 +258,12 @@
           list.appendChild(div);
         });
       });
+
+    window.onload = () => {
+      const today = new Date().toISOString().split('T')[0];
+      document.getElementById('pickupDate').setAttribute('min', today);
+      toggleAddress();
+    };
   </script>
 </body>
 </html>

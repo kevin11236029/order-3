@@ -27,11 +27,26 @@
       <button class="btn btn-success">新增商品</button>
     </form>
 
+    <h4>💰 價格修改</h4>
+    <form id="updatePriceForm" class="mb-3">
+      <select name="productId" id="priceProductSelect" class="form-select mb-2"></select>
+      <input type="number" name="price" id="newPriceInput" placeholder="新價格" required class="form-control mb-2">
+      <button class="btn btn-warning">修改價格</button>
+    </form>
+
+    <h4>🗑️ 刪除商品</h4>
+    <form id="deleteProductForm" class="mb-3">
+      <select name="productId" id="deleteProductSelect" class="form-select mb-2"></select>
+      <button class="btn btn-danger">刪除商品</button>
+    </form>
+
     <h4>📜 補貨紀錄</h4>
     <ul id="historyList" class="list-group"></ul>
   </div>
 
   <script>
+    let currentProducts = [];
+
     function login() {
       const password = document.getElementById('adminPassword').value;
       fetch('/login', {
@@ -44,7 +59,7 @@
           document.getElementById('adminPanel').style.display = 'block';
           loadData();
         } else {
-          alert("❌ 密碼錯誤");
+          alert("密碼錯誤");
         }
       });
     }
@@ -55,37 +70,48 @@
 
     function loadData() {
       fetch('/products').then(res => res.json()).then(products => {
+        currentProducts = products;
         const restockList = document.getElementById('restockList');
+        const priceSelect = document.getElementById('priceProductSelect');
+        const deleteSelect = document.getElementById('deleteProductSelect');
         restockList.innerHTML = '';
+        priceSelect.innerHTML = '';
+        deleteSelect.innerHTML = '';
 
         products.forEach(p => {
           const form = document.createElement('form');
-          form.className = "d-flex gap-2 mb-2 align-items-center";
+          form.className = "d-flex gap-2 mb-2";
           form.innerHTML = `
-            <strong>${p.name}</strong>（庫存：${p.stock}）
+            <strong>${p.name}</strong>（${p.stock} 件）
             <input type="number" name="qty" value="1" min="1" class="form-control" style="width: 80px;">
             <button class="btn btn-sm btn-success">補貨</button>
           `;
-
           form.onsubmit = e => {
             e.preventDefault();
             const qtyInput = form.querySelector('input[name="qty"]');
             const qty = parseInt(qtyInput.value);
-
             if (isNaN(qty) || qty <= 0) {
               alert("❌ 補貨數量必須為大於 0 的整數！");
               qtyInput.focus();
               return;
             }
-
             fetch('/restock', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ productId: p.id, quantity: qty })
             }).then(() => loadData());
           };
-
           restockList.appendChild(form);
+
+          const opt1 = document.createElement('option');
+          opt1.value = p.id;
+          opt1.textContent = `${p.name}（目前 NT$${p.price}）`;
+          priceSelect.appendChild(opt1);
+
+          const opt2 = document.createElement('option');
+          opt2.value = p.id;
+          opt2.textContent = p.name;
+          deleteSelect.appendChild(opt2);
         });
       });
 
@@ -104,29 +130,50 @@
     document.getElementById('addProductForm').addEventListener('submit', function (e) {
       e.preventDefault();
       const formData = new FormData(this);
-      const name = formData.get('name').trim();
-      const price = parseInt(formData.get('price'));
-      const stock = parseInt(formData.get('stock'));
-
-      if (!name) {
-        alert("❌ 請輸入商品名稱！");
-        return;
-      }
-      if (isNaN(price) || price <= 0) {
-        alert("❌ 價格必須為大於 0 的整數！");
-        return;
-      }
-      if (isNaN(stock) || stock < 0) {
-        alert("❌ 初始庫存必須為 0 或以上的整數！");
-        return;
-      }
-
+      const body = {
+        name: formData.get('name'),
+        price: formData.get('price'),
+        stock: formData.get('stock')
+      };
       fetch('/add-product', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, price, stock })
+        body: JSON.stringify(body)
       }).then(() => {
         this.reset();
+        loadData();
+      });
+    });
+
+    document.getElementById('updatePriceForm').addEventListener('submit', function (e) {
+      e.preventDefault();
+      const formData = new FormData(this);
+      const body = {
+        productId: formData.get('productId'),
+        price: formData.get('price')
+      };
+      fetch('/update-price', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      }).then(res => res.json()).then(data => {
+        alert(data.message);
+        loadData();
+      });
+    });
+
+    document.getElementById('deleteProductForm').addEventListener('submit', function (e) {
+      e.preventDefault();
+      const formData = new FormData(this);
+      const productId = formData.get('productId');
+      fetch('/delete-product', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ productId })
+      })
+      .then(res => res.json())
+      .then(data => {
+        alert(data.message);
         loadData();
       });
     });

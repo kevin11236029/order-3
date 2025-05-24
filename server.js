@@ -7,11 +7,11 @@ const port = 3000;
 let products = [
   { id: 1, name: "古早味肉粽三層肉", price: 50, stock: 10, image: "zongzi_pork.jpg", tags: ["經典", "三層肉"] },
   { id: 2, name: "古早味肉粽瘦肉", price: 50, stock: 5, image: "zongzi_lean.jpg", tags: ["瘦肉"] },
-  { id: 3, name: "古早味肉粽(素食)素食", price: 50, stock: 3, image: "zongzi_veg.jpg", tags: ["素食"] },
+  { id: 3, name: "古早味肉粽(素食)", price: 50, stock: 3, image: "zongzi_veg.jpg", tags: ["素食"] },
   { id: 4, name: "手作芋頭巧", price: 50, stock: 10, image: "taro_ball.jpg", tags: ["甜點"] },
   { id: 5, name: "台式蘿蔔糕", price: 50, stock: 5, image: "radish_cake.jpg", tags: ["點心"] },
   { id: 6, name: "紅龜粿", price: 50, stock: 3, image: "red_turtle.jpg", tags: ["傳統"] },
-  { id: 7, name: "草阿粿草阿粿", price: 50, stock: 3, image: "caoa_cake.jpg", tags: ["青草"] },
+  { id: 7, name: "草阿粿", price: 50, stock: 3, image: "caoa_cake.jpg", tags: ["青草"] },
 ];
 
 let orders = [];
@@ -45,9 +45,9 @@ app.get('/products', (req, res) => {
   res.json(available);
 });
 
-// 建立訂單
+// 建立訂單（含備註欄）
 app.post('/order', (req, res) => {
-  const { name, phone, address, items, pickupDate } = req.body;
+  const { name, phone, address, items, pickupDate, note } = req.body;
   let total = 0;
   let errorMsg = "";
 
@@ -76,6 +76,7 @@ app.post('/order', (req, res) => {
     phone,
     address,
     pickupDate,
+    note: note || "",
     items: parsedItems,
     total
   };
