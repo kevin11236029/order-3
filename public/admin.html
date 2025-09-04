@@ -203,6 +203,16 @@
     let currentProducts=[], es;
     const $ = s => document.querySelector(s);
 
+    // ✅ 統一的台灣時間格式（與你圖示相同：YYYY/M/D 上午/下午H:MM:SS）
+    const fmtTwDate = (d) => {
+      const dt = (d instanceof Date) ? d : new Date(d);
+      return dt.toLocaleString('zh-TW', {
+        year:'numeric', month:'numeric', day:'numeric',
+        hour:'numeric', minute:'2-digit', second:'2-digit',
+        hour12:true
+      });
+    };
+
     function previewImage(input,id){
       const f=input.files?.[0],img=document.getElementById(id);
       if(!f){img.style.display='none';img.src='';return}
@@ -221,7 +231,6 @@
     function logout(){ if(es) es.close(); location.href='/logout' }
 
     function loadData(){
-      // 商品/下拉/補貨
       fetch('/products').then(r=>r.json()).then(ps=>{
         currentProducts=ps;
         const restock=$('#restockList'), priceSel=$('#priceProductSelect'), delSel=$('#deleteProductSelect'), imgSel=$('#imageProductSelect');
@@ -249,14 +258,12 @@
         });
       });
 
-      // 補貨紀錄（時間 fallback）
       fetch('/restock-history').then(r=>r.json()).then(rs=>{
         const list=$('#historyList'); list.innerHTML='';
         rs.slice().reverse().forEach(x=>{
           const li=document.createElement('li');
           li.className='list-group-item';
-          const when = x.time || (x.createdAt ? new Date(x.createdAt).toLocaleString() : '—');
-          li.textContent=`${when} - ${x.name} 補貨 ${x.quantity} 件`;
+          li.textContent=`${fmtTwDate(x.time)} - ${x.name} 補貨 ${x.quantity} 件`;
           list.appendChild(li);
         });
       });
@@ -296,6 +303,7 @@
     function appendOrderCard(order, prepend=false){
       const live=$('#liveOrders'),wrap=document.createElement('div');
       wrap.className='order-card card'+(order.completed?' order-card-finished':'');
+
       const lines=(order.itemsDetailed||[]).map(it=>`
         <div class="d-flex align-items-center gap-2 py-1">
           <img src="${it.image||''}" onerror="this.src='https://via.placeholder.com/56?text=No+Image'">
@@ -304,18 +312,17 @@
             <small class="text-muted">x ${it.quantity}　NT$${it.price||0}</small>
           </div>
         </div>`).join('');
-      const badge=order.completed?`<span class="badge badge-finished ms-2">已完成</span>`:'';
-      const orderTime = new Date(order.createdAt||Date.now()).toLocaleString();
-      const orderNo = (order.orderNumber ?? '—');
 
+      const badge=order.completed?`<span class="badge badge-finished ms-2">已完成</span>`:'';
+      const number = (order.orderNumber ?? order._id);
       wrap.innerHTML=`
         <div class="card-body">
           <div class="d-flex justify-content-between align-items-start">
             <div>
               <div class="d-flex align-items-center flex-wrap gap-1">
-                <h6 class="mb-0">訂單 #${orderNo}｜NT$${order.total}</h6>${badge}
+                <h6 class="mb-0">訂單 #${number}｜NT$${order.total}</h6>${badge}
               </div>
-              <small class="text-muted">${orderTime}</small>
+              <small class="text-muted">${fmtTwDate(order.createdAt||Date.now())}</small>
             </div>
             ${order.completed?'':`<button class="btn btn-sm btn-success" onclick="markCompleted('${order._id}',this)">完成</button>`}
           </div>
@@ -326,7 +333,6 @@
           </div>
           <hr class="my-2"/>
           ${lines||'<div class="text-muted">（無明細）</div>'}
-          <div class="text-end fw-bold mt-2">總金額：NT$${order.total||0}</div>
         </div>`;
       if(prepend && live.firstChild) live.prepend(wrap); else live.appendChild(wrap);
     }
@@ -352,12 +358,10 @@
         const box=$('#filterResults'); if(!rows.length){box.innerHTML='<div class="text-muted">無符合結果</div>';return}
         box.innerHTML=rows.map(o=>{
           const tag=o.completed?'<span class="badge bg-success ms-1">完成</span>':'';
-          const when=new Date(o.createdAt).toLocaleString();
-          const no = (o.orderNumber ?? '—');
           return `<div class="small border rounded p-2 mb-2">
             <div class="d-flex justify-content-between">
-              <div>#${no}｜NT$${o.total} ${tag}</div>
-              <div class="text-muted">${when}</div>
+              <div>#${o.orderNumber ?? o._id}｜NT$${o.total} ${tag}</div>
+              <div class="text-muted">${fmtTwDate(o.createdAt)}</div>
             </div>
             <div class="text-muted">姓名：${escapeHtml(o.name)}｜電話：${escapeHtml(o.phone)}｜取貨：${escapeHtml(o.pickupDate||'—')}</div>
           </div>`;

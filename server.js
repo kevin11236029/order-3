@@ -9,6 +9,35 @@ const mongoose = require('mongoose');
 const multer = require('multer');
 const streamifier = require('streamifier');
 const path = require('path');
+const MongoStore = require('connect-mongo');
+
+// 如果跑在 Render（或任何反向代理/HTTPS）後面，這行能讓 secure cookie 正常工作
+app.set('trust proxy', 1);
+
+const isProd = process.env.NODE_ENV === 'production';
+
+app.use(
+  session({
+    name: 'sid', // cookie 名稱，可自訂
+    secret: process.env.SESSION_SECRET || 'sessionSecret',
+    resave: false,
+    saveUninitialized: false, // 建議 false，避免寫入空 session
+    store: MongoStore.create({
+      mongoUrl: process.env.MONGO_URI,
+      collectionName: 'sessions',
+      ttl: 60 * 60 * 24 * 7, // 7 天（秒）
+      autoRemove: 'native',
+      stringify: false,
+    }),
+    cookie: {
+      httpOnly: true,                 // 前端 JS 不能讀 cookie，較安全
+      secure: isProd,                 // 只有在 production（HTTPS）才設為 secure
+      sameSite: 'lax',                // 一般後台足夠；若跨網域 iframe 才需要 'none'
+      maxAge: 1000 * 60 * 60 * 24 * 7 // 7 天（毫秒）
+    },
+  })
+);
+
 
 // Cloudinary
 const cloudinary = require('cloudinary').v2;
@@ -26,13 +55,7 @@ const PORT = process.env.PORT || 3000;
 app.use(express.static('public'));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
-app.use(
-  session({
-    secret: process.env.SESSION_SECRET || 'sessionSecret',
-    resave: false,
-    saveUninitialized: true,
-  })
-);
+
 
 // Multer 使用記憶體（交給 Cloudinary）
 const upload = multer({ storage: multer.memoryStorage() });
