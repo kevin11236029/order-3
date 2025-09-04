@@ -44,10 +44,7 @@ if (!process.env.MONGO_URI) {
 }
 
 mongoose
-  .connect(process.env.MONGO_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-  })
+  .connect(process.env.MONGO_URI)
   .then(() => console.log('✅ MongoDB 已連線'))
   .catch((err) => {
     console.error('❌ MongoDB 連線失敗：', err.message);
@@ -98,7 +95,7 @@ const CounterSchema = new mongoose.Schema({
 
 const RestockSchema = new mongoose.Schema(
   {
-    time: String,
+    time: String,        // 顯示時間（可選）
     name: String,
     quantity: Number,
   },
@@ -462,9 +459,14 @@ app.post('/restock', async (req, res) => {
   res.json({ success: true, message: `✅ 補貨 ${qty} 件至「${p.name}」` });
 });
 
+// ✅ 補貨紀錄（時間 fallback）
 app.get('/restock-history', async (req, res) => {
   const rows = await Restock.find().sort({ createdAt: 1 }).lean();
-  res.json(rows);
+  const normalized = rows.map(x => ({
+    ...x,
+    time: x.time || (x.createdAt ? new Date(x.createdAt).toLocaleString() : '')
+  }));
+  res.json(normalized);
 });
 
 /* ===================== SSE 即時訂單 ===================== */
