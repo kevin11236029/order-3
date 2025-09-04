@@ -1,0 +1,58 @@
+[
+  {
+    "name": "古早味肉粽(三層肉)",
+    "price": 60,
+    "stock": 10,
+    "image": "zongzi_pork.jpg",
+    "tags": ["經典", "三層肉"]
+  },
+  {
+    "name": "古早味肉粽(瘦肉)",
+    "price": 50,
+    "stock": 0,
+    "image": "line_oa_chat_250830_064020.jpg",
+    "tags": ["瘦肉"]
+  },
+  {
+    "name": "古早味肉粽(素食)",
+    "price": 45,
+    "stock": 3,
+    "image": "zongzi_veg.jpg",
+    "tags": ["素食"]
+  },
+  {
+    "name": "手作芋頭巧",
+    "price": 50,
+    "stock": 10,
+    "image": "taro_ball.jpg",
+    "tags": ["甜點"]
+  },
+  {
+    "name": "台式蘿蔔糕(一斤)",
+    "price": 50,
+    "stock": 5,
+    "image": "radish_cake.jpg",
+    "tags": ["點心"]
+  },
+  {
+    "name": "紅龜粿(紅豆)",
+    "price": 35,
+    "stock": 0,
+    "image": "red_turtle.jpg",
+    "tags": ["傳統"]
+  },
+  {
+    "name": "紅龜粿(花生)",
+    "price": 35,
+    "stock": 3,
+    "image": "red_turtle.jpg",
+    "tags": ["傳統"]
+  },
+  {
+    "name": "草阿粿",
+    "price": 30,
+    "stock": 3,
+    "image": "caoa_cake.jpg",
+    "tags": ["青草"]
+  }
+]

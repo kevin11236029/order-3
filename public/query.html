@@ -41,33 +41,56 @@
 
   <script>
     function queryOrders() {
-      const name = document.getElementById('nameInput').value;
-      const phone = document.getElementById('phoneInput').value;
+      const name  = document.getElementById('nameInput').value.trim();
+      const phone = document.getElementById('phoneInput').value.trim();
       const start = document.getElementById('startDate').value;
-      const end = document.getElementById('endDate').value;
-      const sort = document.getElementById('sortSelect').value;
+      const end   = document.getElementById('endDate').value;
+      const sort  = document.getElementById('sortSelect').value;
 
-      const params = new URLSearchParams({ name, phone, start, end, sort });
+      // 🔑 關鍵：帶上 includeDetails=1，後端才會回傳 itemsDetailed（含商品名稱/價格）
+      const params = new URLSearchParams({ name, phone, start, end, sort, includeDetails: '1' });
+
       fetch('/query-orders?' + params)
         .then(res => res.json())
         .then(data => {
           const table = document.getElementById('orderTable');
           table.innerHTML = '';
+
+          if (!Array.isArray(data) || data.length === 0) {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td colspan="8" class="text-center text-muted">無符合結果</td>`;
+            table.appendChild(tr);
+            return;
+          }
+
           data.forEach(order => {
             const tr = document.createElement('tr');
-            const items = order.items.map(i => `${i.product.name} × ${i.quantity}`).join('<br>');
+
+            // 優先用 itemsDetailed（後端在 includeDetails=1 時提供）
+            const srcItems = order.itemsDetailed || order.items || [];
+            const items = srcItems.map(i => {
+              const name = i.name || (i.product && i.product.name) || ''; // 兼容舊欄位
+              const qty  = i.quantity ?? '';
+              // 沒名稱就顯示 productId 以便除錯
+              return name ? `${name} × ${qty}` : `${i.productId || ''} × ${qty}`;
+            }).join('<br>');
+
             tr.innerHTML = `
-              <td>${order.id}</td>
-              <td>${order.name}</td>
-              <td>${order.phone}</td>
-              <td>${order.address}</td>
-              <td>${order.pickupDate}</td>
+              <td>${order.orderNumber || order._id}</td>
+              <td>${order.name || ''}</td>
+              <td>${order.phone || ''}</td>
+              <td>${order.address || ''}</td>
+              <td>${order.pickupDate || ''}</td>
               <td>${order.note || '—'}</td>
-              <td>${items}</td>
-              <td>NT$${order.total}</td>
+              <td>${items || '—'}</td>
+              <td>NT$${order.total ?? 0}</td>
             `;
             table.appendChild(tr);
           });
+        })
+        .catch(() => {
+          const table = document.getElementById('orderTable');
+          table.innerHTML = `<tr><td colspan="8" class="text-center text-danger">查詢失敗，請稍後再試</td></tr>`;
         });
     }
   </script>

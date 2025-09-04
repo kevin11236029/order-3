@@ -3,180 +3,392 @@
 <head>
   <meta charset="UTF-8">
   <title>管理員頁面</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <style>
+    :root{--pad:12px}
+    body{padding-bottom:64px}
+    .preview-img{max-width:150px;max-height:150px;margin-top:6px;display:none;border:1px solid #ddd;border-radius:6px}
+    .order-card img{width:52px;height:52px;object-fit:cover;border-radius:.35rem}
+    .order-card-finished{opacity:.88;border-color:#198754}
+    .badge-finished{background:#198754}
+    .sticky-top-xs{position:sticky;top:0;z-index:1020;background:#fff}
+
+    /* ✅ 橫向滑動的即時訂單列 */
+    .live-scroll{
+      display:flex; gap:.75rem; overflow-x:auto; padding-bottom:.25rem;
+      scroll-snap-type:x mandatory;
+      -webkit-overflow-scrolling: touch;
+    }
+    .live-scroll::-webkit-scrollbar{height:8px}
+    .live-scroll::-webkit-scrollbar-thumb{background:#cfcfcf;border-radius:8px}
+    .order-card{
+      flex:0 0 auto; min-width:320px; max-width:360px; scroll-snap-align:start;
+    }
+
+    @media (max-width:576px){
+      h1{font-size:1.25rem}
+      .card{border-radius:.75rem}
+      .btn{padding:.55rem .75rem}
+      .form-control,.form-select{padding:.55rem .65rem}
+      .section-card .card-body{padding:var(--pad)}
+      .grid-2-xs{display:grid;grid-template-columns:1fr 1fr;gap:.5rem}
+      .stack-xs>*{margin-bottom:.5rem}
+      .hide-xs{display:none}
+      .order-card img{width:46px;height:46px}
+      .order-card{min-width:280px;max-width:85vw}
+    }
+  </style>
 </head>
-<body class="container py-4">
-  <h1 class="mb-4">🔐 管理員後台</h1>
-  <div id="loginSection" class="mb-4">
-    <h4>登入以繼續</h4>
-    <input type="password" id="adminPassword" placeholder="輸入管理員密碼" class="form-control mb-2" />
-    <button class="btn btn-primary" onclick="login()">登入</button>
+<body class="container py-3">
+
+  <!-- Header -->
+  <div class="sticky-top-xs py-2 d-flex align-items-center justify-content-between">
+    <h1 class="mb-0">🔐 管理員後台</h1>
+    <div class="d-flex gap-2">
+      <a class="btn btn-outline-secondary btn-sm" href="/">返回前台</a>
+      <button class="btn btn-outline-danger btn-sm hide-xs" onclick="logout()">登出</button>
+    </div>
   </div>
 
-  <div id="adminPanel" style="display:none;">
-    <button class="btn btn-outline-danger mb-3" onclick="logout()">登出</button>
+  <!-- 登入 -->
+  <div id="loginSection" class="mb-3">
+    <div class="card section-card">
+      <div class="card-body">
+        <h5 class="mb-2">登入以繼續</h5>
+        <div class="d-flex gap-2 stack-xs">
+          <input type="password" id="adminPassword" class="form-control" placeholder="輸入管理員密碼"/>
+          <button class="btn btn-primary" onclick="login()">登入</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
-    <h4>📦 補貨管理</h4>
-    <div id="restockList"></div>
+  <!-- 主控台 -->
+  <div id="adminPanel" style="display:none">
+    <div class="d-sm-none mb-3">
+      <div class="grid-2-xs">
+        <button class="btn btn-outline-danger" onclick="logout()">登出</button>
+        <button class="btn btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#filterWrap">篩選訂單</button>
+      </div>
+    </div>
 
-    <h4 class="mt-5">🆕 新增商品</h4>
-    <form id="addProductForm" class="mb-3">
-      <input type="text" name="name" placeholder="商品名稱" required class="form-control mb-2">
-      <input type="number" name="price" placeholder="價格" required class="form-control mb-2">
-      <input type="number" name="stock" placeholder="初始庫存" required class="form-control mb-2">
-      <button class="btn btn-success">新增商品</button>
-    </form>
+    <!-- 訂單篩選 -->
+    <div class="card section-card mb-3">
+      <div class="card-body">
+        <div class="d-flex align-items-center justify-content-between">
+          <h5 class="mb-0">🔎 訂單篩選</h5>
+          <button class="btn btn-sm btn-outline-secondary d-none d-sm-inline" data-bs-toggle="collapse" data-bs-target="#filterWrap">收合</button>
+        </div>
+        <div id="filterWrap" class="collapse show mt-2">
+          <form id="orderFilterForm" class="row g-2">
+            <div class="col-6 col-sm-3"><input class="form-control" name="name" placeholder="姓名關鍵字"></div>
+            <div class="col-6 col-sm-3"><input class="form-control" name="phone" placeholder="電話關鍵字"></div>
+            <div class="col-6 col-sm-3"><input type="date" class="form-control" name="start"></div>
+            <div class="col-6 col-sm-3"><input type="date" class="form-control" name="end"></div>
+            <div class="col-6 col-sm-3">
+              <select class="form-select" name="completed">
+                <option value="">完成狀態</option><option value="false">未完成</option><option value="true">已完成</option>
+              </select>
+            </div>
+            <div class="col-6 col-sm-3">
+              <select class="form-select" name="sort">
+                <option value="">排序</option><option value="date">取貨日(新→舊)</option><option value="amount">金額(高→低)</option>
+              </select>
+            </div>
+            <div class="col-6 col-sm-3">
+              <div class="form-check mt-1">
+                <input class="form-check-input" type="checkbox" name="includeDetails" id="includeDetails" value="1">
+                <label class="form-check-label" for="includeDetails">顯示明細</label>
+              </div>
+            </div>
+            <div class="col-6 col-sm-3"><button class="btn btn-secondary w-100">查詢</button></div>
+          </form>
+          <div id="filterResults" class="mt-2"></div>
+        </div>
+      </div>
+    </div>
 
-    <h4>💰 價格修改</h4>
-    <form id="updatePriceForm" class="mb-3">
-      <select name="productId" id="priceProductSelect" class="form-select mb-2"></select>
-      <input type="number" name="price" id="newPriceInput" placeholder="新價格" required class="form-control mb-2">
-      <button class="btn btn-warning">修改價格</button>
-    </form>
+    <!-- 即時訂單（橫向滑動） -->
+    <div class="card section-card mb-3">
+      <div class="card-body">
+        <div class="d-flex align-items-center justify-content-between">
+          <h5 class="mb-2">📬 即時訂單</h5>
+          <small id="sseStatus" class="text-muted">即時訂單：連線中…</small>
+        </div>
+        <div id="liveOrders" class="live-scroll"></div>
+      </div>
+    </div>
 
-    <h4>🗑️ 刪除商品</h4>
-    <form id="deleteProductForm" class="mb-3">
-      <select name="productId" id="deleteProductSelect" class="form-select mb-2"></select>
-      <button class="btn btn-danger">刪除商品</button>
-    </form>
+    <!-- 補貨管理 -->
+    <div class="card section-card mb-3">
+      <div class="card-body">
+        <h5 class="mb-2">📦 補貨管理</h5>
+        <div id="restockList"></div>
+      </div>
+    </div>
 
-    <h4>📜 補貨紀錄</h4>
-    <ul id="historyList" class="list-group"></ul>
+    <!-- 新增商品 -->
+    <div class="card section-card mb-3">
+      <div class="card-body">
+        <h5 class="mb-2">🆕 新增商品</h5>
+        <form id="addProductForm" enctype="multipart/form-data">
+          <input name="name" class="form-control mb-2" placeholder="商品名稱" required>
+          <div class="row g-2">
+            <div class="col-6"><input name="price" type="number" class="form-control" placeholder="價格" required></div>
+            <div class="col-6"><input name="stock" type="number" class="form-control" placeholder="初始庫存" required></div>
+          </div>
+          <input name="tags" class="form-control my-2" placeholder="標籤（以逗號分隔）">
+          <input name="image" type="file" accept="image/*" class="form-control" onchange="previewImage(this,'addPreview')">
+          <img id="addPreview" class="preview-img" alt="預覽">
+          <button class="btn btn-success w-100 mt-2">新增商品</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- 更換商品圖片 -->
+    <div class="card section-card mb-3">
+      <div class="card-body">
+        <h5 class="mb-2">🖼️ 更換商品圖片</h5>
+        <form id="updateImageForm" enctype="multipart/form-data">
+          <select name="productId" id="imageProductSelect" class="form-select mb-2"></select>
+          <input name="image" type="file" accept="image/*" class="form-control" required onchange="previewImage(this,'updatePreview')">
+          <img id="updatePreview" class="preview-img" alt="預覽">
+          <button class="btn btn-info text-white w-100 mt-2">上傳並更換</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- 價格/刪除 -->
+    <div class="row g-3">
+      <div class="col-12 col-sm-6">
+        <div class="card section-card h-100">
+          <div class="card-body">
+            <h5 class="mb-2">💰 價格修改</h5>
+            <form id="updatePriceForm">
+              <select name="productId" id="priceProductSelect" class="form-select mb-2"></select>
+              <div class="d-flex gap-2">
+                <input name="price" id="newPriceInput" type="number" class="form-control" placeholder="新價格" required>
+                <button class="btn btn-warning">修改</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-sm-6">
+        <div class="card section-card h-100">
+          <div class="card-body">
+            <h5 class="mb-2">🗑️ 刪除商品</h5>
+            <form id="deleteProductForm">
+              <div class="d-flex gap-2">
+                <select name="productId" id="deleteProductSelect" class="form-select"></select>
+                <button class="btn btn-danger">刪除</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 補貨紀錄 -->
+    <div class="card section-card my-3">
+      <div class="card-body">
+        <h5 class="mb-2">📜 補貨紀錄</h5>
+        <ul id="historyList" class="list-group"></ul>
+      </div>
+    </div>
   </div>
 
   <script>
-    let currentProducts = [];
+    let currentProducts=[], es;
+    const $ = s => document.querySelector(s);
 
-    function login() {
-      const password = document.getElementById('adminPassword').value;
-      fetch('/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password })
-      }).then(res => res.json()).then(data => {
-        if (data.success) {
-          document.getElementById('loginSection').style.display = 'none';
-          document.getElementById('adminPanel').style.display = 'block';
-          loadData();
-        } else {
-          alert("密碼錯誤");
-        }
+    function previewImage(input,id){
+      const f=input.files?.[0],img=document.getElementById(id);
+      if(!f){img.style.display='none';img.src='';return}
+      const r=new FileReader(); r.onload=e=>{img.src=e.target.result;img.style.display='block'}; r.readAsDataURL(f);
+    }
+    const escapeHtml=s=>String(s||'').replace(/[&<>"']/g,m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));
+
+    function login(){
+      fetch('/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:$('#adminPassword').value})})
+      .then(r=>r.json()).then(d=>{
+        if(!d.success) return alert('密碼錯誤');
+        $('#loginSection').style.display='none'; $('#adminPanel').style.display='block';
+        loadData(); connectOrderStream();
       });
     }
+    function logout(){ if(es) es.close(); location.href='/logout' }
 
-    function logout() {
-      location.href = '/logout';
-    }
+    function loadData(){
+      fetch('/products').then(r=>r.json()).then(ps=>{
+        currentProducts=ps;
+        const restock=$('#restockList'), priceSel=$('#priceProductSelect'), delSel=$('#deleteProductSelect'), imgSel=$('#imageProductSelect');
+        restock.innerHTML=''; priceSel.innerHTML=''; delSel.innerHTML=''; imgSel.innerHTML='';
 
-    function loadData() {
-      fetch('/products').then(res => res.json()).then(products => {
-        currentProducts = products;
-        const restockList = document.getElementById('restockList');
-        const priceSelect = document.getElementById('priceProductSelect');
-        const deleteSelect = document.getElementById('deleteProductSelect');
-        restockList.innerHTML = '';
-        priceSelect.innerHTML = '';
-        deleteSelect.innerHTML = '';
-
-        products.forEach(p => {
-          const form = document.createElement('form');
-          form.className = "d-flex gap-2 mb-2";
-          form.innerHTML = `
-            <strong>${p.name}</strong>（${p.stock} 件）
-            <input type="number" name="qty" value="1" min="1" class="form-control" style="width: 80px;">
-            <button class="btn btn-sm btn-success">補貨</button>
-          `;
-          form.onsubmit = e => {
-            e.preventDefault();
-            const qtyInput = form.querySelector('input[name="qty"]');
-            const qty = parseInt(qtyInput.value);
-            if (isNaN(qty) || qty <= 0) {
-              alert("❌ 補貨數量必須為大於 0 的整數！");
-              qtyInput.focus();
-              return;
-            }
-            fetch('/restock', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ productId: p.id, quantity: qty })
-            }).then(() => loadData());
+        ps.forEach(p=>{
+          const f=document.createElement('form'); f.className='d-flex gap-2 align-items-center mb-2';
+          f.innerHTML=`
+            <strong class="me-1">${escapeHtml(p.name)}</strong>
+            <span class="text-secondary">（${p.stock} 件${p.outOfStock?'｜缺貨':''}）</span>
+            <input name="qty" type="number" value="1" min="1" class="form-control" style="max-width:96px">
+            <button class="btn btn-sm btn-success">補貨</button>`;
+          f.onsubmit=e=>{e.preventDefault(); const q=+f.qty.value||0;
+            if(q<=0) return alert('❌ 補貨數量需為正整數');
+            fetch('/restock',{
+              method:'POST',headers:{'Content-Type':'application/json'},
+              body:JSON.stringify({productId:p._id,quantity:q})
+            }).then(()=>loadData());
           };
-          restockList.appendChild(form);
+          restock.appendChild(f);
 
-          const opt1 = document.createElement('option');
-          opt1.value = p.id;
-          opt1.textContent = `${p.name}（目前 NT$${p.price}）`;
-          priceSelect.appendChild(opt1);
-
-          const opt2 = document.createElement('option');
-          opt2.value = p.id;
-          opt2.textContent = p.name;
-          deleteSelect.appendChild(opt2);
+          [[priceSel,`${p.name}（NT$${p.price}）`],[delSel,p.name],[imgSel,p.name]].forEach(([sel,txt])=>{
+            const o=document.createElement('option'); o.value=p._id; o.textContent=txt; sel.appendChild(o);
+          });
         });
       });
 
-      fetch('/restock-history').then(res => res.json()).then(records => {
-        const list = document.getElementById('historyList');
-        list.innerHTML = '';
-        records.slice().reverse().forEach(r => {
-          const item = document.createElement('li');
-          item.className = "list-group-item";
-          item.textContent = `${r.time} - ${r.name} 補貨 ${r.quantity} 件`;
-          list.appendChild(item);
+      fetch('/restock-history').then(r=>r.json()).then(rs=>{
+        const list=$('#historyList'); list.innerHTML='';
+        rs.slice().reverse().forEach(x=>{
+          const li=document.createElement('li');
+          li.className='list-group-item';
+          li.textContent=`${x.time} - ${x.name} 補貨 ${x.quantity} 件`;
+          list.appendChild(li);
         });
+      });
+
+      // 初始顯示最近 10 筆（橫向卡片）
+      fetch('/orders').then(r=>r.json()).then(all=>{
+        const live=$('#liveOrders'); live.innerHTML='';
+        all.slice(-10).reverse().forEach(o=>appendOrderCard(o));
       });
     }
 
-    document.getElementById('addProductForm').addEventListener('submit', function (e) {
-      e.preventDefault();
-      const formData = new FormData(this);
-      const body = {
-        name: formData.get('name'),
-        price: formData.get('price'),
-        stock: formData.get('stock')
-      };
-      fetch('/add-product', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-      }).then(() => {
-        this.reset();
-        loadData();
-      });
-    });
+    function setSseStatus(msg, ok=true){
+      const el=$('#sseStatus'); if(!el) return;
+      el.textContent=`即時訂單：${msg}`;
+      el.className=`${ok?'text-success':'text-danger'}`;
+    }
 
-    document.getElementById('updatePriceForm').addEventListener('submit', function (e) {
-      e.preventDefault();
-      const formData = new FormData(this);
-      const body = {
-        productId: formData.get('productId'),
-        price: formData.get('price')
-      };
-      fetch('/update-price', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-      }).then(res => res.json()).then(data => {
-        alert(data.message);
-        loadData();
-      });
-    });
+    function connectOrderStream(){
+      if(es) es.close();
+      try{
+        es=new EventSource('/admin/orders/stream');
+        setSseStatus('連線中…', true);
 
-    document.getElementById('deleteProductForm').addEventListener('submit', function (e) {
-      e.preventDefault();
-      const formData = new FormData(this);
-      const productId = formData.get('productId');
-      fetch('/delete-product', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ productId })
+        es.addEventListener('hello', () => setSseStatus('已連線', true));
+        es.addEventListener('order', ev => { try{ appendOrderCard(JSON.parse(ev.data), true); }catch{} });
+
+        es.onerror = () => {
+          setSseStatus('連線中斷，重試中…', false);
+          es.close();
+          setTimeout(connectOrderStream, 2500);
+        };
+      }catch{
+        setSseStatus('初始化失敗', false);
+      }
+    }
+
+    function appendOrderCard(order, prepend=false){
+      const live=$('#liveOrders'),wrap=document.createElement('div');
+      wrap.className='order-card card'+(order.completed?' order-card-finished':'');
+      const lines=(order.itemsDetailed||[]).map(it=>`
+        <div class="d-flex align-items-center gap-2 py-1">
+          <img src="${it.image||''}" onerror="this.src='https://via.placeholder.com/56?text=No+Image'">
+          <div class="flex-grow-1">
+            <div>${escapeHtml(it.name||'')}</div>
+            <small class="text-muted">x ${it.quantity}　NT$${it.price||0}</small>
+          </div>
+        </div>`).join('');
+      const badge=order.completed?`<span class="badge badge-finished ms-2">已完成</span>`:'';
+      wrap.innerHTML=`
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-start">
+            <div>
+              <div class="d-flex align-items-center flex-wrap gap-1">
+                <h6 class="mb-0">訂單 #${order._id}｜NT$${order.total}</h6>${badge}
+              </div>
+              <small class="text-muted">${new Date(order.createdAt||Date.now()).toLocaleString()}</small>
+            </div>
+            ${order.completed?'':`<button class="btn btn-sm btn-success" onclick="markCompleted('${order._id}',this)">完成</button>`}
+          </div>
+          <div class="mt-2">
+            <small class="text-muted d-block">姓名｜電話｜取貨：${escapeHtml(order.name)}｜${escapeHtml(order.phone)}｜${escapeHtml(order.pickupDate||'—')}</small>
+            <small class="text-muted d-block">地址：${escapeHtml(order.address||'—')}</small>
+            <small class="text-muted d-block">備註：${escapeHtml(order.note||'—')}</small>
+          </div>
+          <hr class="my-2"/>
+          ${lines||'<div class="text-muted">（無明細）</div>'}
+        </div>`;
+      if(prepend && live.firstChild) live.prepend(wrap); else live.appendChild(wrap);
+    }
+
+    function markCompleted(id,btn){
+      btn.disabled=true;
+      fetch('/complete-order',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({orderId:id})
       })
-      .then(res => res.json())
-      .then(data => {
-        alert(data.message);
-        loadData();
+      .then(r=>r.json()).then(d=>{
+        if(!d.success){alert(d.message||'失敗'); btn.disabled=false; return}
+        btn.closest('.order-card').classList.add('order-card-finished'); btn.remove();
       });
+    }
+
+    // 篩選
+    document.getElementById('orderFilterForm').addEventListener('submit',function(e){
+      e.preventDefault();
+      const fd=new FormData(this), params=new URLSearchParams(fd);
+      fetch('/query-orders?'+params.toString()).then(r=>r.json()).then(rows=>{
+        const box=$('#filterResults'); if(!rows.length){box.innerHTML='<div class="text-muted">無符合結果</div>';return}
+        box.innerHTML=rows.map(o=>{
+          const tag=o.completed?'<span class="badge bg-success ms-1">完成</span>':'';
+          return `<div class="small border rounded p-2 mb-2">
+            <div class="d-flex justify-content-between">
+              <div>#${o._id}｜NT$${o.total} ${tag}</div>
+              <div class="text-muted">${new Date(o.createdAt).toLocaleString()}</div>
+            </div>
+            <div class="text-muted">姓名：${escapeHtml(o.name)}｜電話：${escapeHtml(o.phone)}｜取貨：${escapeHtml(o.pickupDate||'—')}</div>
+          </div>`;
+        }).join('');
+      });
+    });
+
+    // 表單提交
+    document.getElementById('addProductForm').addEventListener('submit',function(e){
+      e.preventDefault(); const fd=new FormData(this);
+      fetch('/add-product',{method:'POST',body:fd}).then(r=>r.json()).then(d=>{
+        alert(d.message); this.reset(); document.getElementById('addPreview').style.display='none'; loadData();
+      });
+    });
+
+    document.getElementById('updateImageForm').addEventListener('submit',function(e){
+      e.preventDefault(); const fd=new FormData(this);
+      fetch('/update-product-image',{method:'POST',body:fd}).then(r=>r.json()).then(d=>{
+        alert(d.message); this.reset(); document.getElementById('updatePreview').style.display='none'; loadData();
+      });
+    });
+
+    document.getElementById('updatePriceForm').addEventListener('submit',function(e){
+      e.preventDefault(); const fd=new FormData(this);
+      fetch('/update-price',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({productId:fd.get('productId'),price:fd.get('price')})
+      }).then(r=>r.json()).then(d=>{alert(d.message); loadData();});
+    });
+
+    document.getElementById('deleteProductForm').addEventListener('submit',function(e){
+      e.preventDefault(); const fd=new FormData(this);
+      fetch('/delete-product',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({productId:fd.get('productId')})
+      }).then(r=>r.json()).then(d=>{alert(d.message); loadData();});
     });
   </script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
