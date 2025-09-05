@@ -11,11 +11,45 @@ const streamifier = require('streamifier');
 const path = require('path');
 const MongoStore = require('connect-mongo');
 
-// 如果跑在 Render（或任何反向代理/HTTPS）後面，這行能讓 secure cookie 正常工作
+// Cloudinary
+const cloudinary = require('cloudinary').v2;
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key:    process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+// ====== 建立 Express（⚠️ 一定要先建立 app，才能呼叫 app.set / app.use）======
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// 若跑在 Render（或任何反向代理/HTTPS）後面，這行能讓 secure cookie 正常工作
 app.set('trust proxy', 1);
 
-const isProd = process.env.NODE_ENV === 'production';
+// ====== 基本中介層 ======
+app.use(express.static('public'));
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
 
+// Multer 使用記憶體（交給 Cloudinary）
+const upload = multer({ storage: multer.memoryStorage() });
+
+// ====== Mongo 連線（先確認有 URI，再啟用 session）======
+if (!process.env.MONGO_URI) {
+  console.error('❌ 沒讀到 MONGO_URI，請檢查 .env');
+  process.exit(1);
+}
+
+mongoose
+  .connect(process.env.MONGO_URI)
+  .then(() => console.log('✅ MongoDB 已連線'))
+  .catch((err) => {
+    console.error('❌ MongoDB 連線失敗：', err.message);
+    process.exit(1);
+  });
+
+// ====== Session（使用 MongoDB 作為儲存）======
+const isProd = process.env.NODE_ENV === 'production';
 app.use(
   session({
     name: 'sid', // cookie 名稱，可自訂
@@ -37,42 +71,6 @@ app.use(
     },
   })
 );
-
-
-// Cloudinary
-const cloudinary = require('cloudinary').v2;
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key:    process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
-
-// ====== 建立 Express ======
-const app = express();
-const PORT = process.env.PORT || 3000;
-
-// ====== 中介層 ======
-app.use(express.static('public'));
-app.use(express.urlencoded({ extended: true }));
-app.use(express.json());
-
-
-// Multer 使用記憶體（交給 Cloudinary）
-const upload = multer({ storage: multer.memoryStorage() });
-
-// ====== Mongo 連線 ======
-if (!process.env.MONGO_URI) {
-  console.error('❌ 沒讀到 MONGO_URI，請檢查 .env');
-  process.exit(1);
-}
-
-mongoose
-  .connect(process.env.MONGO_URI)
-  .then(() => console.log('✅ MongoDB 已連線'))
-  .catch((err) => {
-    console.error('❌ MongoDB 連線失敗：', err.message);
-    process.exit(1);
-  });
 
 /* ===================== MongoDB Schema ===================== */
 const ProductSchema = new mongoose.Schema(
