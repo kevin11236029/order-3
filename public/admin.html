@@ -203,16 +203,6 @@
     let currentProducts=[], es;
     const $ = s => document.querySelector(s);
 
-    // ✅ 統一的台灣時間格式（與你圖示相同：YYYY/M/D 上午/下午H:MM:SS）
-    const fmtTwDate = (d) => {
-      const dt = (d instanceof Date) ? d : new Date(d);
-      return dt.toLocaleString('zh-TW', {
-        year:'numeric', month:'numeric', day:'numeric',
-        hour:'numeric', minute:'2-digit', second:'2-digit',
-        hour12:true
-      });
-    };
-
     function previewImage(input,id){
       const f=input.files?.[0],img=document.getElementById(id);
       if(!f){img.style.display='none';img.src='';return}
@@ -261,9 +251,10 @@
       fetch('/restock-history').then(r=>r.json()).then(rs=>{
         const list=$('#historyList'); list.innerHTML='';
         rs.slice().reverse().forEach(x=>{
+          const t = x.time || '';
           const li=document.createElement('li');
           li.className='list-group-item';
-          li.textContent=`${fmtTwDate(x.time)} - ${x.name} 補貨 ${x.quantity} 件`;
+          li.textContent=`${t} - ${x.name} 補貨 ${x.quantity} 件`;
           list.appendChild(li);
         });
       });
@@ -300,6 +291,15 @@
       }
     }
 
+    // ▶ 計算總金額（後端沒給 total 時用）
+    function calcTotal(order){
+      const items = order.itemsDetailed || [];
+      return items.reduce((s,it)=>{
+        const p = Number(it.price)||0, q = Number(it.quantity)||0;
+        return s + p*q;
+      },0);
+    }
+
     function appendOrderCard(order, prepend=false){
       const live=$('#liveOrders'),wrap=document.createElement('div');
       wrap.className='order-card card'+(order.completed?' order-card-finished':'');
@@ -313,27 +313,39 @@
           </div>
         </div>`).join('');
 
+      const total = (typeof order.total === 'number') ? order.total : calcTotal(order);
+      const totalFooter = `<div class="text-end mt-2"><strong>總金額：NT$${total}</strong></div>`;
+
       const badge=order.completed?`<span class="badge badge-finished ms-2">已完成</span>`:'';
-      const number = (order.orderNumber ?? order._id);
+
+      const idShow =
+        (order.orderNumber!=null && order.orderNumber!=='') ? `#${order.orderNumber}` :
+        (order.id ? `#${String(order.id)}` :
+        (order._id ? `#${String(order._id)}` : '#—'));
+
+      const orderIdForBtn = order._id || order.id || '';
+
       wrap.innerHTML=`
         <div class="card-body">
           <div class="d-flex justify-content-between align-items-start">
             <div>
               <div class="d-flex align-items-center flex-wrap gap-1">
-                <h6 class="mb-0">訂單 #${number}｜NT$${order.total}</h6>${badge}
+                <h6 class="mb-0">訂單 ${idShow}</h6>${badge}
               </div>
-              <small class="text-muted">${fmtTwDate(order.createdAt||Date.now())}</small>
+              <small class="text-muted">${new Date(order.createdAt||Date.now()).toLocaleString()}</small>
             </div>
-            ${order.completed?'':`<button class="btn btn-sm btn-success" onclick="markCompleted('${order._id}',this)">完成</button>`}
+            ${order.completed?'':`<button class="btn btn-sm btn-success" onclick="markCompleted('${orderIdForBtn}',this)">完成</button>`}
           </div>
           <div class="mt-2">
-            <small class="text-muted d-block">姓名｜電話｜取貨：${escapeHtml(order.name)}｜${escapeHtml(order.phone)}｜${escapeHtml(order.pickupDate||'—')}</small>
+            <small class="text-muted d-block">姓名｜電話｜取貨：${escapeHtml(order.name||'')}｜${escapeHtml(order.phone||'')}｜${escapeHtml(order.pickupDate||'—')}</small>
             <small class="text-muted d-block">地址：${escapeHtml(order.address||'—')}</small>
             <small class="text-muted d-block">備註：${escapeHtml(order.note||'—')}</small>
           </div>
           <hr class="my-2"/>
           ${lines||'<div class="text-muted">（無明細）</div>'}
+          ${totalFooter}
         </div>`;
+
       if(prepend && live.firstChild) live.prepend(wrap); else live.appendChild(wrap);
     }
 
@@ -358,10 +370,13 @@
         const box=$('#filterResults'); if(!rows.length){box.innerHTML='<div class="text-muted">無符合結果</div>';return}
         box.innerHTML=rows.map(o=>{
           const tag=o.completed?'<span class="badge bg-success ms-1">完成</span>':'';
+          const idShow =
+            (o.orderNumber!=null && o.orderNumber!=='') ? `#${o.orderNumber}` :
+            (o._id ? `#${String(o._id)}` : '#—');
           return `<div class="small border rounded p-2 mb-2">
             <div class="d-flex justify-content-between">
-              <div>#${o.orderNumber ?? o._id}｜NT$${o.total} ${tag}</div>
-              <div class="text-muted">${fmtTwDate(o.createdAt)}</div>
+              <div>${idShow}｜NT$${o.total ?? ''} ${tag}</div>
+              <div class="text-muted">${new Date(o.createdAt).toLocaleString()}</div>
             </div>
             <div class="text-muted">姓名：${escapeHtml(o.name)}｜電話：${escapeHtml(o.phone)}｜取貨：${escapeHtml(o.pickupDate||'—')}</div>
           </div>`;
